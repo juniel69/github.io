@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Background</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+
+        }
+
+        .background {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Replace the existing gradient-overlay style with this */
+        .gradient-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(circle at center,
+                    transparent 0%,
+                    transparent 45%,
+                    /* Increased from 30% */
+                    #101010 85%,
+                    /* Increased from 70% */
+                    #101010 100%),
+                linear-gradient(to bottom,
+                    #101010 0%,
+                    transparent 15%,
+                    transparent 85%,
+                    #101010 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .square {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: rgba(50, 50, 50);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+            /* Remove transition for sharp turns */
+        }
+
+        .trail-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .trail {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.1);
+            stroke-width: 1;
+            stroke-linecap: round;
+        }
+
+        .spawn-effect {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.05);
+            opacity: 0.8;
+            pointer-events: none;
+            animation: spawnExpand 0.5s ease-out forwards;
+        }
+
+        @keyframes spawnExpand {
+            0% {
+                width: 10px;
+                height: 10px;
+                opacity: 0.8;
+                transform: translate(-50%, -50%);
+            }
+
+            100% {
+                width: 50px;
+                height: 50px;
+                opacity: 0;
+                transform: translate(-50%, -50%);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background"></div>
+    <div class="gradient-overlay"></div>
+    <svg class="trail-container"></svg>
+    <script>
+        const MAX_SQUARES = 50;
+        let activeSquares = [];
+
+        function createSquare() {
+            // Skip creation if limit reached
+            if (activeSquares.length >= MAX_SQUARES) {
+                return;
+            }
+
+            const square = document.createElement('div');
+            square.className = 'square';
+
+            const startX = Math.random() * window.innerWidth;
+            const startY = Math.random() * window.innerHeight;
+            square.style.left = startX + 'px';
+            square.style.top = startY + 'px';
+
+            // Create path for trail
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.classList.add('trail');
+            // Update initial point to square center
+            let points = [`${startX + 5},${startY + 5}`];
+            let lastPoint = { x: startX + 5, y: startY + 5 };
+            path.setAttribute('d', 'M ' + points.join(' '));
+            document.querySelector('.trail-container').appendChild(path);
+
+            let currentX = startX;
+            let currentY = startY;
+            let speed = 2; // pixels per frame
+            let currentDirection = '';
+
+            // Add spawn effect
+            const spawnEffect = document.createElement('div');
+            spawnEffect.className = 'spawn-effect';
+            spawnEffect.style.left = (startX + 5) + 'px';
+            spawnEffect.style.top = (startY + 5) + 'px';
+            document.querySelector('.background').appendChild(spawnEffect);
+            setTimeout(() => spawnEffect.remove(), 500);
+
+            function changeDirection() {
+                const opposites = {
+                    'up': 'down',
+                    'down': 'up',
+                    'left': 'right',
+                    'right': 'left'
+                };
+
+                // Filter out the opposite direction from possible choices
+                const directions = ['up', 'down', 'left', 'right'].filter(dir =>
+                    dir !== opposites[currentDirection]
+                );
+
+                // If this is not the first direction change, also remove current direction
+                if (currentDirection) {
+                    const index = directions.indexOf(currentDirection);
+                    if (index > -1) directions.splice(index, 1);
+                }
+
+                currentDirection = directions[Math.floor(Math.random() * directions.length)];
+
+                // Add point at direction change for sharp corners
+                points.push(`${currentX + 5},${currentY + 5}`);
+                path.setAttribute('d', 'M ' + points.join(' L '));
+                lastPoint = { x: currentX + 5, y: currentY + 5 };
+
+                clearInterval(moveInterval);
+                moveInterval = setInterval(() => {
+                    switch (currentDirection) {
+                        case 'up':
+                            currentY -= speed;
+                            break;
+                        case 'down':
+                            currentY += speed;
+                            break;
+                        case 'left':
+                            currentX -= speed;
+                            break;
+                        case 'right':
+                            currentX += speed;
+                            break;
+                    }
+
+                    square.style.transform = `translate(${currentX - startX}px, ${currentY - startY}px)`;
+
+                    // Only add points if moved enough distance
+                    const dx = Math.abs(currentX + 5 - lastPoint.x);
+                    const dy = Math.abs(currentY + 5 - lastPoint.y);
+                    if (dx > 10 || dy > 10) {
+                        points.push(`${currentX + 5},${currentY + 5}`);
+                        path.setAttribute('d', 'M ' + points.join(' L '));
+                        lastPoint = { x: currentX + 5, y: currentY + 5 };
+                    }
+
+                    // Remove if out of bounds
+                    if (currentX < -100 || currentX > window.innerWidth + 100 ||
+                        currentY < -100 || currentY > window.innerHeight + 100) {
+                        clearInterval(moveInterval);
+                        clearInterval(directionInterval);
+                        // Fade out trail before removing
+                        path.style.transition = 'opacity 0.5s';
+                        path.style.opacity = '0';
+                        setTimeout(() => {
+                            square.remove();
+                            path.remove();
+                        }, 500);
+                    }
+                }, 16); // ~60fps
+            }
+
+            let moveInterval;
+            // Change direction every 2-5 seconds
+            const directionInterval = setInterval(() => {
+                changeDirection();
+            }, 2000 + Math.random() * 3000);
+
+            // Initial direction change
+            changeDirection();
+
+            document.querySelector('.background').appendChild(square);
+
+            // Track square and its intervals
+            const squareData = {
+                square,
+                path,
+                moveInterval: null,
+                directionInterval: null
+            };
+            activeSquares.push(squareData);
+
+            // Update interval tracking
+            squareData.directionInterval = directionInterval;
+        }
+
+        function cleanupRemovedSquares() {
+            // Remove references to squares that are no longer in the DOM
+            activeSquares = activeSquares.filter(data => data.square.parentElement !== null);
+        }
+
+        function spawnSquare() {
+            // Clean up array first
+            cleanupRemovedSquares();
+
+            // Check if we can spawn
+            if (activeSquares.length < MAX_SQUARES) {
+                createSquare();
+            }
+        }
+
+        // Create new square every 500ms
+        setInterval(spawnSquare, 500);
+
+        // Initial squares
+        for (let i = 0; i < Math.min(10, MAX_SQUARES); i++) createSquare();
+    </script>
+</body>
+
+</html>
