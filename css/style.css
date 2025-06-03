@@ -175,7 +175,7 @@ h1 {
     letter-spacing: 2px;
 }
 
-#home p {
+#home p:not(.small-text) {
     font-size: 1.5rem;
     margin-bottom: 1rem;
 }
@@ -384,17 +384,17 @@ h2 {
 }
 
 /* Typography */
-h1, h2, h3 {
-    margin-bottom: 1rem;
-    font-weight: 700;
-}
-
 .small-text {
     font-size: 0.9rem;
     color: var(--accent);
     margin-bottom: 0.5rem;
     text-transform: uppercase;
     letter-spacing: 2px;
+}
+
+#home p:not(.small-text) {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
 }
 
 /* Hamburger Menu */
